@@ -1,78 +1,59 @@
-import {
-    Injectable,
-    NotFoundException,
-    BadRequestException
-} from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 import { Comment } from './comment.model';
 
 @Injectable()
 export class CommentsService {
-    private comments: Comment[] = [];
+    constructor(@InjectModel('Comment') private readonly commentModel: Model<Comment>) {}
 
-    constructor() {
-        this.createComment({
-            content: 'Primer comentario',
-            postId: '474ba1f6-bf10-4b10-8cd4-ca1b03ceceb6',
-        });
-        this.createComment({
-            content: 'Segundo comentario',
-            postId: '8a1e2761-5301-477e-8de6-ad1f1614471e',
-        });
-        this.createComment({
-            content: 'Tercer comentario',
-            postId: 'abd8449c-5fa2-4f8a-bf27-7430e6ace42a',
-        });
+    async getAllComments(): Promise<Comment[]> {
+        return await this.commentModel.find().exec();
     }
 
-    getAllComments(): Comment[] {
-        return this.comments;
+    async getCommentsByPostId(postId: string): Promise<Comment[]> {
+        return await this.commentModel.find({ postId }).exec();
     }
 
-    getCommentsByPostId(postId: string): Comment[] {
-        return this.comments.filter(comment => comment.postId === postId);
-    }
-
-    getComment(id: string): Comment {
-        const comment = this.comments.find(comment => comment.id === id);
-        if (!comment) {
-            throw new NotFoundException('Comment not found');
+    async getComment(id: string): Promise<Comment | null> {
+        try {
+            const comment = await this.commentModel.findById(id).exec();
+            if (!comment) {
+                throw new NotFoundException('Comment not found');
+            }
+            return comment;
+        } catch (error: any) {
+            throw new NotFoundException(error.message);
         }
-        return comment;
     }
 
-    createComment(commentData: Omit<Comment, 'id' | 'createdAt'>): Comment {
-        if (!commentData.content || !commentData.postId) {
-            throw new BadRequestException('Content and postId are required');
+    async createComment(commentData: Omit<Comment, 'id' | 'createdAt'>): Promise<Comment> {
+        try {
+            const createdComment = new this.commentModel(commentData);
+            return await createdComment.save();
+        } catch (error: any) {
+            throw new InternalServerErrorException(error.message);
         }
-
-        const newComment: Comment = {
-            id: uuidv4(),
-            createdAt: new Date(),
-            ...commentData,
-        };
-
-        this.comments.push(newComment);
-        return newComment;
     }
 
-    updateComment(id: string, commentData: Partial<Comment>): Comment {
-        const commentIndex = this.comments.findIndex(comment => comment.id === id);
-        if (commentIndex === -1) {
-            throw new NotFoundException('Comment not found');
+    async updateComment(id: string, commentData: Partial<Comment>): Promise<Comment | null> {
+        try {
+            const existingComment = await this.commentModel.findById(id).exec();
+            if (!existingComment) {
+                throw new NotFoundException('Comment not found');
+            }
+            existingComment.set(commentData);
+            return await existingComment.save();
+        } catch (error: any) {
+            throw new InternalServerErrorException(error.message);
         }
-
-        const updatedComment = { ...this.comments[commentIndex], ...commentData };
-        this.comments[commentIndex] = updatedComment;
-
-        return updatedComment;
     }
 
-    deleteComment(id: string): void {
-        const index = this.comments.findIndex(comment => comment.id === id);
-        if (index === -1) {
-            throw new NotFoundException('Comment not found');
+    async deleteComment(id: string): Promise<void> {
+        try {
+            await this.commentModel.findByIdAndDelete(id).exec();
+        } catch (error: any) {
+            throw new InternalServerErrorException(error.message);
         }
-        this.comments.splice(index, 1);
     }
 }

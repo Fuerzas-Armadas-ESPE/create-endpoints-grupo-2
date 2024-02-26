@@ -7,28 +7,35 @@ export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @Get()
-  getAllComments(): Comment[] {
-    return this.commentsService.getAllComments();
-  }
-
-  @Get('post/:postId')
-  getCommentsByPostId(@Param('postId') postId: string): Comment[] {
-    return this.commentsService.getCommentsByPostId(postId);
+  async getAllComments(): Promise<Comment[]> {
+    return await this.commentsService.getAllComments();
   }
 
   @Get(':id')
-  getComment(@Param('id') id: string): Comment {
-    const comment = this.commentsService.getComment(id);
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
+  async getComment(@Param('id') id: string): Promise<Comment | null> {
+    try {
+      return await this.commentsService.getComment(id);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException();
     }
-    return comment;
+  }
+
+  @Get('post/:postId')
+  async getCommentsByPostId(@Param('postId') postId: string): Promise<Comment[]> {
+    try {
+      return await this.commentsService.getCommentsByPostId(postId);
+    } catch (error) {
+      throw new InternalServerErrorException();
+    }
   }
 
   @Post()
-  createComment(@Body() commentData: Omit<Comment, 'id' | 'createdAt'>): Comment {
+  async createComment(@Body() commentData: Omit<Comment, 'id' | 'createdAt'>): Promise<Comment> {
     try {
-      return this.commentsService.createComment(commentData);
+      return await this.commentsService.createComment(commentData);
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -38,9 +45,9 @@ export class CommentsController {
   }
 
   @Put(':id')
-  updateComment(@Param('id') id: string, @Body() commentData: Partial<Comment>): Comment {
+  async updateComment(@Param('id') id: string, @Body() commentData: Partial<Comment>): Promise<Comment | null> {
     try {
-      return this.commentsService.updateComment(id, commentData);
+      return await this.commentsService.updateComment(id, commentData);
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -50,9 +57,9 @@ export class CommentsController {
   }
 
   @Delete(':id')
-  deleteComment(@Param('id') id: string): void {
+  async deleteComment(@Param('id') id: string): Promise<void> {
     try {
-      this.commentsService.deleteComment(id);
+      await this.commentsService.deleteComment(id);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
