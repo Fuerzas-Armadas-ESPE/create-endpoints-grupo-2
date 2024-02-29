@@ -6,6 +6,6 @@ export class AppController {
 
   @Get()
   getHello(): string {
-    return '¡Metodos Nuevos para los Endpoints!';
+    return 'Hello World!';
   }
 }
